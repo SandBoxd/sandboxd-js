@@ -1,0 +1,32 @@
+<project>
+
+	<property name="src" value="src"/>
+	<property name="lib" value="lib"/>
+	<property name="doc" value="doc"/>
+	<property name="deploy" value="deploy"/>
+	<property name="jsprefix" value="sandboxd"/>
+	<property name="version" value="2.0"/>
+	<property name="apiVersion" value="20140305"/>
+	
+    <target name="clean">
+        <delete dir="${deploy}"/>
+    </target>
+
+    <target name="compile">
+		<buildnumber file="build.num"/>
+        <mkdir dir="${deploy}"/>
+        <mkdir dir="${deploy}/${apiVersion}-${version}.${build.number}"/>
+		<copy file="${src}/sandboxd.js" tofile="${deploy}/${apiVersion}-${version}.${build.number}/${jsprefix}.js"/>
+		<java jar="C:/Program Files (x86)/Google/Closure Compiler/compiler.jar" fork="true">
+			<arg value="--js=${src}/sandboxd.js"/>
+			<arg value="--js_output_file=${deploy}/${apiVersion}-${version}.${build.number}/${jsprefix}.min.js"/>
+		</java>
+		<java jar="C:/dev/jsdoc-toolkit/jsrun.jar" fork="true">
+			<arg value="C:/dev/jsdoc-toolkit/app/run.js"/>
+			<arg value="${src}/sandboxd.js"/>
+			<arg value="-t=C:/dev/jsdoc-toolkit/templates/jsdoc"/>
+			<arg value="-d=${deploy}/${apiVersion}-${version}.${build.number}/${doc}"/>
+		</java>
+    </target>
+	
+</project>
