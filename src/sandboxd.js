@@ -1,5 +1,5 @@
 /*!
- * Copyright (c) 2014 Sam MacPherson
+ * Copyright (c) 2014 SandBoxd Inc.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
  * 
@@ -10,6 +10,12 @@
  * SandBoxd API Client Library
  * JavaScript/NodeJS Implementation
  */
+ /** @module sandboxd */
+ /**
+  * @callback standardCallback
+  * @param {String} [error] If present then an error has occured. You should always check this value before using the data. Check the string for a detailed description of the error.
+  * @param {*} [data] The data returned by the call.
+  */
 (function () {
 	var sandboxd = (function () {
 		/*
@@ -34,7 +40,7 @@
 			var params = {};
 			if (typeof location !== 'undefined') {
 				var urlParams = location.search.substr(1).split("&");
-				for (var i in urlParams) {
+				for (var i = 0; i < urlParams.length; i++) {
 					if (urlParams[i] != "") {
 						var keyValue = urlParams[i].split("=");
 						params[decodeURIComponent(keyValue[0])] = decodeURIComponent(keyValue[1]);
@@ -263,41 +269,131 @@
 			}
 		}
 		
-		var storage = {
+		var storage = /** @lends module:sandboxd.storage */ {
+			
+			/**
+			 * <p>Create or update a key/value pair in SandBoxd cloud storage for the specified user.</p>
+			 * 
+			 * @name module:sandboxd.storage.setItem
+			 * @function
+			 * @param {String} key A unique identifier.
+			 * @param {String} value Some piece of data.
+			 * @param {Integer} uid The unique identifier of the user.
+			 * @param {String} sid The session identifier of the user.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
+			/**
+			 * <p><b>[Client Only]</b> Create or update a key/value pair in SandBoxd cloud storage for the current user.</p>
+			 * 
+			 * @name module:sandboxd.storage.setItem
+			 * @function
+			 * @param {String} key A unique identifier.
+			 * @param {String} value Some piece of data.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
 			setItem: function (key, value, a1, a2, a3) {
 				checkInit();
 				
 				var o = uidSidCallbackOverload(a1, a2, a3);
 				query("POST", "/storage/update/" + _gameid, o.cb, { key:key, value:value }, o.uid, o.sid);
 			},
+			
+			/**
+			 * <p>Retrieve the data associated with the given key from SandBoxd cloud storage for the specified user.</p>
+			 * 
+			 * @name module:sandboxd.storage.getItem
+			 * @function
+			 * @param {String} key A unique identifier.
+			 * @param {Integer} uid The unique identifier of the user.
+			 * @param {String} sid The session identifier of the user.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
+			/**
+			 * <p><b>[Client Only]</b> Retrieve the data associated with the given key from SandBoxd cloud storage for the current user.</p>
+			 * 
+			 * @name module:sandboxd.storage.getItem
+			 * @function
+			 * @param {String} key A unique identifier.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
 			getItem: function (key, a1, a2, a3) {
 				checkInit();
 				
 				var o = uidSidCallbackOverload(a1, a2, a3);
 				query("GET", "/storage/" + _gameid, o.cb, { key:key }, o.uid, o.sid);
 			},
+			
+			/**
+			 * <p>Delete some data from SandBoxd cloud storage for the specified user.</p>
+			 * 
+			 * @name module:sandboxd.storage.removeItem
+			 * @function
+			 * @param {String} key A unique identifier.
+			 * @param {Integer} uid The unique identifier of the user.
+			 * @param {String} sid The session identifier of the user.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
+			/**
+			 * <p><b>[Client Only]</b> Delete some data from SandBoxd cloud storage for the current user.</p>
+			 * 
+			 * @name module:sandboxd.storage.removeItem
+			 * @function
+			 * @param {String} key A unique identifier.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
 			removeItem: function (key, a1, a2, a3) {
 				checkInit();
 				
 				var o = uidSidCallbackOverload(a1, a2, a3);
 				query("POST", "/storage/delete/" + _gameid, o.cb, { key:key }, o.uid, o.sid);
 			},
+			
+			/**
+			 * <p>Retrieve all data from SandBoxd cloud storage for the specified user.</p>
+			 * 
+			 * @name module:sandboxd.storage.all
+			 * @function
+			 * @param {Integer} uid The unique identifier of the user.
+			 * @param {String} sid The session identifier of the user.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
+			/**
+			 * <p><b>[Client Only]</b> Retrieve all data from SandBoxd cloud storage for the current user.</p>
+			 * 
+			 * @name module:sandboxd.storage.all
+			 * @function
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
 			all: function (a1, a2, a3) {
 				checkInit();
 				
 				var o = uidSidCallbackOverload(a1, a2, a3);
-				query("POST", "/storage", o.cb, { game:_gameid }, o.uid, o.sid);
+				queryAll("POST", "/storage", o.cb, { game:_gameid }, o.uid, o.sid);
 			}
+			
 		};
 		
-		return {
+		return /** @lends module:sandboxd */ {
 			
+			/**
+			 * <p>Initialize the library. This function must be called before using the SandBoxd API.</p>
+			 * 
+			 * @param {Integer} gameid The unique game identifier.
+			 * @param {String} apikey The API key for this game.
+			 * @param {String} [host=api.sandboxd.com] Set this if you want to override the default host.
+			 */
 			init: function (gameid, apikey, host) {
 				_gameid = gameid;
 				_apikey = apikey;
 				if (host !== undefined) _host = host;
 			},
 			
+			/**
+			 * <p><b>[Client Only]</b> Turn on automatic management of storage via the localStorage object.</p>
+			 * 
+			 * <p>This will intercept all calls to localStorage and store the data in
+			 * the SandBoxd cloud instead.</p>
+			 */
 			autoCloudStorage: function () {
 				checkInit();
 				
@@ -386,6 +482,18 @@
 				}, 10);
 			},
 			
+			/**
+			 * <p>Verify that the specified user is who they claim to be.</p>
+			 * 
+			 * <p>This is most commonly used for server-side verification of a new
+			 * user who has just connected to your server.</p>
+			 * 
+			 * @name module:sandboxd.verifyUser
+			 * @function
+			 * @param {Integer} uid The unique identifier of the user.
+			 * @param {String} sid The session identifier of the user.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
 			verifyUser: function (a1, a2, a3) {
 				checkInit();
 				
@@ -393,16 +501,62 @@
 				query("GET", "/gamesessions/verify", o.cb, null, o.uid, o.sid);
 			},
 			
+			/**
+			 * <p>Get the user object for the specified user.</p>
+			 * 
+			 * @name module:sandboxd.getUser
+			 * @function
+			 * @param {Integer} uid The unique identifier of the user.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
+			/**
+			 * <p><b>[Client Only]</b> Get the user object for the current user.</p>
+			 * 
+			 * @name module:sandboxd.getUser
+			 * @function
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
 			getUser: function (a1, a2) {
 				var o = uidCallbackOverload(a1, a2);
 				query("GET", "/users/" + o.uid, o.cb);
 			},
 			
+			/**
+			 * <p>Get all the specified user's friends.</p>
+			 * 
+			 * @name module:sandboxd.getUserFriends
+			 * @function
+			 * @param {Integer} uid The unique identifier of the user.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
+			/**
+			 * <p><b>[Client Only]</b> Get all the current user's friends.</p>
+			 * 
+			 * @name module:sandboxd.getUserFriends
+			 * @function
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
 			getUserFriends: function (a1, a2) {
 				var o = uidCallbackOverload(a1, a2);
 				queryAll("GET", "/friends", o.cb, { user:o.uid });
 			},
 			
+			/**
+			 * <p>Retrieve the display group that the specified user has set for this game.</p>
+			 * 
+			 * @name module:sandboxd.getUserGroup
+			 * @function
+			 * @param {Integer} uid The unique identifier of the user.
+			 * @param {String} sid The session identifier of the user.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
+			/**
+			 * <p><b>[Client Only]</b> Retrieve the display group that the current user has set for this game.</p>
+			 * 
+			 * @name module:sandboxd.getUserGroup
+			 * @function
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
 			getUserGroup: function (a1, a2, a3) {
 				checkInit();
 				
@@ -410,6 +564,34 @@
 				query("GET", "/displaygroups/" + _gameid, o.cb, null, o.uid, o.sid);
 			},
 			
+			/**
+			 * <p>Get the group object for the specified group.</p>
+			 * 
+			 * @name module:sandboxd.getGroup
+			 * @function
+			 * @param {Integer} gid The unique identifier of the group.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
+			getGroup: function (gid, cb) {
+				query("GET", "/groups/" + gid, cb);
+			},
+			
+			/**
+			 * <p>Get all previously completed transactions for the specified user.</p>
+			 * 
+			 * @name module:sandboxd.getUserTransactions
+			 * @function
+			 * @param {Integer} uid The unique identifier of the user.
+			 * @param {String} sid The session identifier of the user.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
+			/**
+			 * <p><b>[Client Only]</b> Get all previously completed transactions for the current user.</p>
+			 * 
+			 * @name module:sandboxd.getUserTransactions
+			 * @function
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
 			getUserTransactions: function (a1, a2, a3) {
 				checkInit();
 				
@@ -417,6 +599,38 @@
 				queryAll("GET", "/transactions", o.cb, { game:_gameid }, o.uid, o.sid);
 			},
 			
+			/**
+			 * <p>Create a micro-transaction for the specified user. Calling this will present the user
+			 * with a purchase dialog to accept or decline the amount specified.</p>
+			 * 
+			 * <p>A successful response means the user accepted the transaction.</p>
+			 * 
+			 * <p>An error means either the user declined the transaction or something else went wrong.</p>
+			 * 
+			 * @name module:sandboxd.createTransaction
+			 * @function
+			 * @param {String} microid A unique identifier for this transaction you make up. You can use the microid to determine if a user has previously purchased this transaction.
+			 * @param {String} description A description of the virtual item the user is purchasing. This will be presented to the user so they can decide whether to accept the purchase or not.
+			 * @param {Integer} amount The cost of the transaction in credits. <b>100 credits = 1 USD</b>
+			 * @param {Integer} uid The unique identifier of the user.
+			 * @param {String} sid The session identifier of the user.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
+			/**
+			 * <p><b>[Client Only]</b> Create a micro-transaction for the current user. Calling this will present the user
+			 * with a purchase dialog to accept or decline the amount specified.</p>
+			 * 
+			 * <p>A successful response means the user accepted the transaction.</p>
+			 * 
+			 * <p>An error means either the user declined the transaction or something else went wrong.</p>
+			 * 
+			 * @name module:sandboxd.createTransaction
+			 * @function
+			 * @param {String} microid A unique identifier for this transaction you make up. You can use the microid to determine if a user has previously purchased this transaction.
+			 * @param {String} description A description of the virtual item the user is purchasing. This will be presented to the user so they can decide whether to accept the purchase or not.
+			 * @param {Integer} amount The cost of the transaction in credits. <b>100 credits = 1 USD</b>
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
 			createTransaction: function (microid, description, amount, a1, a2, a3) {
 				checkInit();
 				
@@ -424,6 +638,42 @@
 				query("GET", "/transactions/create", o.cb, { session:o.sid, microid:microid, desc:description, amount:amount }, o.uid, o.sid);
 			},
 			
+			/**
+			 * <p>Update the internal location of the specified user within your game.</p>
+			 * 
+			 * <p>The user's location will be displayed to their friends on the friends list. When a friend clicks to join
+			 * the specified user's game the string provided in the <i>data</i> argument will be included as a URL
+			 * parameter to the game.</p>
+			 * 
+			 * @example <caption>User 123 joins a multiplayer room with id 5 in a game called "Example Shooter"</caption>
+			 * //Friends will see this below the user's name: "Example Shooter - Deathmatch".
+			 * sandboxd.updateLocation("Deathmatch", "roomid:5", 123, "SessionID")
+			 * 
+			 * @name module:sandboxd.updateLocation
+			 * @function
+			 * @param {String} label A user friendly way to describe where the user is within your game.
+			 * @param {String} data A unique way to identify where the user is within your game.
+			 * @param {Integer} uid The unique identifier of the user.
+			 * @param {String} sid The session identifier of the user.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
+			/**
+			 * <p><b>[Client Only]</b> Update the internal location of the curent user within your game.</p>
+			 * 
+			 * <p>The user's location will be displayed to their friends on the friends list. When a friend clicks to join
+			 * the curent user's game the string provided in the <i>data</i> argument will be included as a URL
+			 * parameter to the game.</p>
+			 * 
+			 * @example <caption>The current user joins a multiplayer room with id 5 in a game called "Example Shooter"</caption>
+			 * //Friends will see this below the user's name: "Example Shooter - Deathmatch".
+			 * sandboxd.updateLocation("Deathmatch", "roomid:5")
+			 * 
+			 * @name module:sandboxd.updateLocation
+			 * @function
+			 * @param {String} label A user friendly way to describe where the user is within your game.
+			 * @param {String} data A unique way to identify where the user is within your game.
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
 			updateLocation: function (label, data, a1, a2, a3) {
 				checkInit();
 				
@@ -431,10 +681,40 @@
 				query("POST", "/gamesessions/update", o.cb, { session:o.sid, label:label, data:data }, o.uid, o.sid);
 			},
 			
+			/**
+			 * Access to cloud storage.
+			 * 
+			 * @namespace {Object} module:sandboxd.storage
+			 */
 			storage: storage,
 			
+			/**
+			 * Access to user achievements.
+			 * 
+			 * @namespace {Object} module:sandboxd.achievements
+			 */
 			achievements: {
 				
+				/**
+				 * <p>Create or update an achievement for the specified user.</p>
+				 * 
+				 * @name module:sandboxd.achievements.update
+				 * @function
+				 * @param {String} key The achievement name.
+				 * @param {Integer} value The value to set this achievement to. Must be between 0 and the maximum value for this achievement.
+				 * @param {Integer} uid The unique identifier of the user.
+				 * @param {String} sid The session identifier of the user.
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
+				/**
+				 * <p><b>[Client Only]</b> Create or update an achievement for the current user.</p>
+				 * 
+				 * @name module:sandboxd.achievements.update
+				 * @function
+				 * @param {String} key The achievement name.
+				 * @param {Integer} value The value to set this achievement to. Must be between 0 and the maximum value for this achievement.
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
 				update: function (key, value, a1, a2, a3) {
 					checkInit();
 					
@@ -442,6 +722,23 @@
 					query("POST", "/achievements/update/" + _gameid, o.cb, { key:key, value:value }, o.uid, o.sid);
 				},
 				
+				/**
+				 * <p>List all achievements for the specified user.</p>
+				 * 
+				 * @name module:sandboxd.achievements.list
+				 * @function
+				 * @param {Integer} uid The unique identifier of the user.
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
+				/**
+				 * <p><b>[Client Only]</b> List all achievements for the specified user.</p>
+				 * 
+				 * <p>The achievement objects returned have a convience function "update()" to update the value.</p>
+				 * 
+				 * @name module:sandboxd.achievements.list
+				 * @function
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
 				list: function (a1, a2) {
 					var self = this;
 					var o = uidCallbackOverload(a1, a2);
@@ -457,6 +754,15 @@
 					}, { user:o.uid });
 				},
 				
+				/**
+				 * <p>List all achievement definitions for this game.</p>
+				 * 
+				 * <p>The achievement definition objects returned have a convience function "create()" to create a new achievement for the current user.</p>
+				 * 
+				 * @name module:sandboxd.achievements.getDefinitions
+				 * @function
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
 				getDefinitions: function (cb) {
 					var self = this;
 					queryAll("GET", "/achievementdefinitions", function (err, data) {
@@ -481,8 +787,33 @@
 				
 			},
 			
+			/**
+			 * Access to user statistics.
+			 * 
+			 * @namespace {Object} module:sandboxd.stats
+			 */
 			stats: {
 				
+				/**
+				 * <p>Create or update an statistic for the specified user.</p>
+				 * 
+				 * @name module:sandboxd.stats.update
+				 * @function
+				 * @param {String} key The statistic name.
+				 * @param {String|Number} value The value to set this statistic to. If this statistic is ranked then value must be a number.
+				 * @param {Integer} uid The unique identifier of the user.
+				 * @param {String} sid The session identifier of the user.
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
+				/**
+				 * <p><b>[Client Only]</b> Create or update an statistic for the current user.</p>
+				 * 
+				 * @name module:sandboxd.stats.update
+				 * @function
+				 * @param {String} key The statistic name.
+				 * @param {String|Number} value The value to set this statistic to. If this statistic is ranked then value must be a number.
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
 				update: function (key, value, a1, a2, a3) {
 					checkInit();
 					
@@ -490,6 +821,23 @@
 					query("POST", "/stats/update/" + _gameid, o.cb, { key:key, value:value }, o.uid, o.sid);
 				},
 				
+				/**
+				 * <p>List all statistics for the specified user.</p>
+				 * 
+				 * @name module:sandboxd.stats.list
+				 * @function
+				 * @param {Integer} uid The unique identifier of the user.
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
+				/**
+				 * <p><b>[Client Only]</b> List all statistics for the specified user.</p>
+				 * 
+				 * <p>The stat objects returned have a convience function "update()" to update the value.</p>
+				 * 
+				 * @name module:sandboxd.stats.list
+				 * @function
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
 				list: function (a1, a2) {
 					var self = this;
 					var o = uidCallbackOverload(a1, a2);
@@ -505,6 +853,15 @@
 					}, { user:o.uid });
 				},
 				
+				/**
+				 * <p>List all statistic definitions for this game.</p>
+				 * 
+				 * <p>The stat definition objects returned have a convience function "create()" to create a new achievement for the current user.</p>
+				 * 
+				 * @name module:sandboxd.stats.getDefinitions
+				 * @function
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
 				getDefinitions: function (cb) {
 					var self = this;
 					queryAll("GET", "/statdefinitions", function (err, data) {

@@ -21,12 +21,9 @@
 			<arg value="--js=${src}/sandboxd.js"/>
 			<arg value="--js_output_file=${deploy}/${apiVersion}-${version}.${build.number}/${jsprefix}.min.js"/>
 		</java>
-		<java jar="C:/dev/jsdoc-toolkit/jsrun.jar" fork="true">
-			<arg value="C:/dev/jsdoc-toolkit/app/run.js"/>
-			<arg value="${src}/sandboxd.js"/>
-			<arg value="-t=C:/dev/jsdoc-toolkit/templates/jsdoc"/>
-			<arg value="-d=${deploy}/${apiVersion}-${version}.${build.number}/${doc}"/>
-		</java>
+		<exec executable="C:/Users/Sam/node_modules/.bin/jsdoc.cmd">
+			<arg line="${src}/sandboxd.js -d ${deploy}/${apiVersion}-${version}.${build.number}/${doc} -t C:/Users/Sam/node_modules/ink-docstrap/template"/>
+		</exec>
     </target>
 	
 </project>
