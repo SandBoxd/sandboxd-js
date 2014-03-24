@@ -84,6 +84,21 @@
 			else return _gameid + " " + sha256(hash + uid + sid) + " " + uid + " " + sid;
 		}
 		
+		function exponentialBackoff (f, cb, retries, maxRetries) {
+			if (retries === undefined) retries = 0;
+			if (maxRetries === undefined) maxRetries = 3;
+			
+			f(function (err, data) {
+				if (err == null || retries == maxRetries) {
+					if (cb != null) cb(err, data);
+				} else {
+					setTimeout(function () {
+						exponentialBackoff(f, cb, retries + 1, maxRetries);
+					}, (1 << retries) * 1000);
+				}
+			});
+		}
+		
 		/**
 		 * Execute a query to the SandBoxd API. Uses XMLHttpRequest for client and http.request for NodeJS.
 		 */
@@ -295,7 +310,12 @@
 				checkInit();
 				
 				var o = uidSidCallbackOverload(a1, a2, a3);
-				query("POST", "/storage/update/" + _gameid, o.cb, { key:key, value:value }, o.uid, o.sid);
+				exponentialBackoff(
+					function (cb) {
+						query("POST", "/storage/update/" + _gameid, cb, { key:key, value:value }, o.uid, o.sid)
+					},
+					o.cb
+				);
 			},
 			
 			/**
@@ -320,7 +340,12 @@
 				checkInit();
 				
 				var o = uidSidCallbackOverload(a1, a2, a3);
-				query("GET", "/storage/" + _gameid, o.cb, { key:key }, o.uid, o.sid);
+				exponentialBackoff(
+					function (cb) {
+						query("GET", "/storage/" + _gameid, cb, { key:key }, o.uid, o.sid);
+					},
+					o.cb
+				);
 			},
 			
 			/**
@@ -345,7 +370,12 @@
 				checkInit();
 				
 				var o = uidSidCallbackOverload(a1, a2, a3);
-				query("POST", "/storage/delete/" + _gameid, o.cb, { key:key }, o.uid, o.sid);
+				exponentialBackoff(
+					function (cb) {
+						query("POST", "/storage/delete/" + _gameid, cb, { key:key }, o.uid, o.sid);
+					},
+					o.cb
+				);
 			},
 			
 			/**
@@ -368,7 +398,12 @@
 				checkInit();
 				
 				var o = uidSidCallbackOverload(a1, a2, a3);
-				queryAll("POST", "/storage", o.cb, { game:_gameid }, o.uid, o.sid);
+				exponentialBackoff(
+					function (cb) {
+						queryAll("POST", "/storage", o.cb, { game:_gameid }, o.uid, o.sid);
+					},
+					o.cb
+				);
 			}
 			
 		};
@@ -429,8 +464,10 @@
 							keys.sort();
 						}
 						
-						cache[key] = value;
-						pendingUpdates[key] = "set";
+						if (cache[key] !== value) {
+							cache[key] = value;
+							pendingUpdates[key] = "set";
+						}
 					} else {
 						_setItem.call(this, key, value);
 					}
@@ -460,12 +497,21 @@
 				};
 				
 				//Initialize the data -- need to do synchronously to make sure we have the data before any calls to localStorage
-				query("GET", "/storage", function (err, data) {
-					for (var i = 0; i < data.items.length; i++) {
-						keys.push(data.items[i].key);
-						params[data.items[i].key] = data.items[i].value;
+				exponentialBackoff(
+					function (cb) {
+						query("GET", "/storage", cb, { game:_gameid }, params["uid"], params["sid"], false);
+					},
+					function (err, data) {
+						if (err == null) {
+							for (var i = 0; i < data.items.length; i++) {
+								keys.push(data.items[i].key);
+								params[data.items[i].key] = data.items[i].value;
+							}
+						} else {
+							throw err;
+						}
 					}
-				}, { game:_gameid }, o.uid, o.sid, false);
+				);
 				
 				//Every frame check for pending updates and apply them
 				//This will cut down on calls because only the last command gets applied
