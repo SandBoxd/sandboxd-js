@@ -434,6 +434,7 @@
 				
 				if (params["uid"] == 0) return;		//Cloud storage not available for guests
 				
+				var failure = false;
 				var pendingUpdates = {};
 				var keys = [];
 				var cache = {};
@@ -443,22 +444,35 @@
 				var _setItem = Storage.prototype.setItem;
 				var _removeItem = Storage.prototype.removeItem;
 				
+				//Initialize the data -- need to do synchronously to make sure we have the data before any calls to localStorage
+				query("GET", "/storage", function (err, data) {
+					if (err == null) {
+						for (var i = 0; i < data.items.length; i++) {
+							keys.push(data.items[i].key);
+							cache[data.items[i].key] = data.items[i].value;
+						}
+					} else {
+						failure = true;
+						throw err;
+					}
+				}, { game:_gameid }, params["uid"], params["sid"], false);
+				
 				Storage.prototype.key = function (index) {
-					if (this === window.localStorage) {
+					if (this === window.localStorage && !failure) {
 						return keys[index];
 					} else {
 						return _key.call(this, index);
 					}
 				};
 				Storage.prototype.getItem = function (key) {
-					if (this === window.localStorage) {
+					if (this === window.localStorage && !failure) {
 						return cache[key];
 					} else {
 						return _getItem.call(this, key);
 					}
 				};
 				Storage.prototype.setItem = function (key, value) {
-					if (this === window.localStorage) {
+					if (this === window.localStorage && !failure) {
 						if (cache[key] === undefined) {
 							keys.push(key);
 							keys.sort();
@@ -473,7 +487,7 @@
 					}
 				};
 				Storage.prototype.removeItem = function (key) {
-					if (this === window.localStorage) {
+					if (this === window.localStorage && !failure) {
 						delete cache[key];
 						for (var i = 0; i < keys.length; i++) {
 							if (keys[i] == key) {
@@ -487,7 +501,7 @@
 					}
 				};
 				Storage.prototype.clear = function () {
-					if (this === window.localStorage) {
+					if (this === window.localStorage && !failure) {
 						for (var i = 0; i < keys.length; i++) {
 							this.removeItem(key[i]);
 						}
@@ -495,23 +509,6 @@
 						_removeItem.clear(this);
 					}
 				};
-				
-				//Initialize the data -- need to do synchronously to make sure we have the data before any calls to localStorage
-				exponentialBackoff(
-					function (cb) {
-						query("GET", "/storage", cb, { game:_gameid }, params["uid"], params["sid"], false);
-					},
-					function (err, data) {
-						if (err == null) {
-							for (var i = 0; i < data.items.length; i++) {
-								keys.push(data.items[i].key);
-								params[data.items[i].key] = data.items[i].value;
-							}
-						} else {
-							throw err;
-						}
-					}
-				);
 				
 				//Every frame check for pending updates and apply them
 				//This will cut down on calls because only the last command gets applied
