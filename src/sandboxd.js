@@ -57,6 +57,11 @@
 		var _apikey;
 		var params = getQueryParameters();
 		
+		//Param defaults
+		if (params["uid"] === undefined) params["uid"] = 0;
+		if (params["name"] === undefined) params["name"] = "Guest";
+		if (params["avatar"] === undefined) params["avatar"] = "https://static-sandboxd-com.s3.amazonaws.com/images/avatar-default.png";
+		
 		function sha256 (text) {
 			return CryptoJS.SHA256(text).toString(CryptoJS.enc.Hex);
 		}
@@ -102,8 +107,14 @@
 		/**
 		 * Execute a query to the SandBoxd API. Uses XMLHttpRequest for client and http.request for NodeJS.
 		 */
-		function query (method, apiUrl, cb, params, uid, sid, async) {
+		function query (method, apiUrl, cb, params, uid, sid, async, guestAllowed) {
 			if (async === undefined) async = true;
+			if (guestAllowed === undefined) guestAllowed = false;
+			
+			if (!guestAllowed && uid == 0 && sid !== undefined) {
+				if (cb != null) cb("Only registered users can perform this action.");
+				return;
+			}
 			
 			var authHeader = _gameid != null ? buildAuthHeader(params, uid, sid) : null;
 			var i;
@@ -199,8 +210,8 @@
 		/**
 		 * Executes query over a paginated list returning all results.
 		 */
-		function queryAll (method, apiUrl, cb, params, uid, sid, async) {
-			function QueryResult (method, apiUrl, cb, params, uid, sid, async) {
+		function queryAll (method, apiUrl, cb, params, uid, sid, async, guestAllowed) {
+			function QueryResult (method, apiUrl, cb, params, uid, sid, async, guestAllowed) {
 				this.method = method;
 				this.apiUrl = apiUrl;
 				this.cb = cb;
@@ -208,12 +219,13 @@
 				this.uid = uid;
 				this.sid = sid;
 				this.async = async;
+				this.guestAllowed = guestAllowed;
 				
 				this.items = [];
 				this.params.offset = 0;
 			}
 			QueryResult.prototype.run = function () {
-				query(this.method, this.apiUrl, this.response.bind(this), this.params, this.uid, this.sid, this.async);
+				query(this.method, this.apiUrl, this.response.bind(this), this.params, this.uid, this.sid, this.async, this.guestAllowed);
 			};
 			QueryResult.prototype.response = function (err, data) {
 				if (err == null) {
@@ -236,7 +248,7 @@
 				}
 			};
 			
-			new QueryResult(method, apiUrl, cb, params, async).run();
+			new QueryResult(method, apiUrl, cb, params, async, guestAllowed).run();
 		}
 		
 		/**
@@ -541,7 +553,7 @@
 				checkInit();
 				
 				var o = uidSidCallbackOverload(a1, a2, a3);
-				query("GET", "/gamesessions/verify", o.cb, null, o.uid, o.sid);
+				query("GET", "/gamesessions/verify", o.cb, null, o.uid, o.sid, true, true);
 			},
 			
 			/**
