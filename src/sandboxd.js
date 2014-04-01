@@ -133,7 +133,6 @@
 			if (typeof XMLHttpRequest !== 'undefined') {
 				//Browser
 				var req = new XMLHttpRequest();
-				if (async) req.withCredentials = true;
 				
 				//Response
 				req.onreadystatechange = function (e) {
@@ -159,10 +158,12 @@
 				//Submit query
 				if (method == "POST") {
 					req.open(method, "https://" + _host + "/" + version + apiUrl, async);
+					if (async) req.withCredentials = true;
 					if (authHeader != null) req.setRequestHeader("X-SandBoxd-Authentication", authHeader);
 					req.send(queryStr);
 				} else {
 					req.open(method, "https://" + _host + "/" + version + apiUrl + (queryStr.length > 0 ? "?" + queryStr : ""), async);
+					if (async) req.withCredentials = true;
 					if (authHeader != null) req.setRequestHeader("X-SandBoxd-Authentication", authHeader);
 					req.send();
 				}
@@ -463,78 +464,100 @@
 							keys.push(data.items[i].key);
 							cache[data.items[i].key] = data.items[i].value;
 						}
+						keys.sort();
 					} else {
 						failure = true;
 						throw err;
 					}
 				}, { game:_gameid }, params["uid"], params["sid"], false);
 				
-				Storage.prototype.key = function (index) {
-					if (this === window.localStorage && !failure) {
-						return keys[index];
-					} else {
-						return _key.call(this, index);
+				if (!failure) {
+					function setLength () {
+						Object.defineProperty(localStorage, "length", {
+							configurable: true,
+							get: function () {
+								return keys.length;
+							}
+						});
 					}
-				};
-				Storage.prototype.getItem = function (key) {
-					if (this === window.localStorage && !failure) {
-						return cache[key];
-					} else {
-						return _getItem.call(this, key);
-					}
-				};
-				Storage.prototype.setItem = function (key, value) {
-					if (this === window.localStorage && !failure) {
-						if (cache[key] === undefined) {
-							keys.push(key);
-							keys.sort();
+					setLength();
+					Storage.prototype.key = function (index) {
+						if (this === window.localStorage) {
+							setLength();
+							
+							return keys[index];
+						} else {
+							return _key.call(this, index);
 						}
-						
-						if (cache[key] !== value) {
-							cache[key] = value;
-							pendingUpdates[key] = "set";
+					};
+					Storage.prototype.getItem = function (key) {
+						if (this === window.localStorage) {
+							setLength();
+							
+							return cache[key];
+						} else {
+							return _getItem.call(this, key);
 						}
-					} else {
-						_setItem.call(this, key, value);
-					}
-				};
-				Storage.prototype.removeItem = function (key) {
-					if (this === window.localStorage && !failure) {
-						delete cache[key];
-						for (var i = 0; i < keys.length; i++) {
-							if (keys[i] == key) {
-								keys.splice(i, 1);
-								break;
+					};
+					Storage.prototype.setItem = function (key, value) {
+						if (this === window.localStorage) {
+							setLength();
+							
+							if (cache[key] === undefined) {
+								keys.push(key);
+								keys.sort();
+							}
+							
+							if (cache[key] !== value) {
+								cache[key] = value;
+								pendingUpdates[key] = "set";
+							}
+						} else {
+							_setItem.call(this, key, value);
+						}
+					};
+					Storage.prototype.removeItem = function (key) {
+						if (this === window.localStorage) {
+							setLength();
+							
+							delete cache[key];
+							for (var i = 0; i < keys.length; i++) {
+								if (keys[i] == key) {
+									keys.splice(i, 1);
+									break;
+								}
+							}
+							pendingUpdates[key] = "rem";
+						} else {
+							_removeItem.call(this, key);
+						}
+					};
+					Storage.prototype.clear = function () {
+						if (this === window.localStorage) {
+							setLength();
+							
+							for (var i = 0; i < keys.length; i++) {
+								this.removeItem(key[i]);
+							}
+						} else {
+							_removeItem.clear(this);
+						}
+					};
+					
+					//Every frame check for pending updates and apply them
+					//This will cut down on calls because only the last command gets applied
+					setInterval(function () {
+						for (var i in pendingUpdates) {
+							if (pendingUpdates[i] == "set") {
+								storage.setItem(i, cache[i]);
+							} else if (pendingUpdates[i] == "rem") {
+								storage.removeItem(i);
 							}
 						}
-						pendingUpdates[key] = "rem";
-					} else {
-						_removeItem.call(this, key);
-					}
-				};
-				Storage.prototype.clear = function () {
-					if (this === window.localStorage && !failure) {
-						for (var i = 0; i < keys.length; i++) {
-							this.removeItem(key[i]);
-						}
-					} else {
-						_removeItem.clear(this);
-					}
-				};
-				
-				//Every frame check for pending updates and apply them
-				//This will cut down on calls because only the last command gets applied
-				setInterval(function () {
-					for (var i in pendingUpdates) {
-						if (pendingUpdates[i] == "set") {
-							storage.setItem(i, cache[i]);
-						} else if (pendingUpdates[i] == "rem") {
-							storage.removeItem(i);
-						}
-					}
-					
-					pendingUpdates = {};
-				}, 10);
+						
+						pendingUpdates = {};
+					}, 10);
+				}
 			},
 			
 			/**
