@@ -133,7 +133,7 @@
 			if (typeof XMLHttpRequest !== 'undefined') {
 				//Browser
 				var req = new XMLHttpRequest();
-				req.withCredentials = true;
+				if (async) req.withCredentials = true;
 				
 				//Response
 				req.onreadystatechange = function (e) {
