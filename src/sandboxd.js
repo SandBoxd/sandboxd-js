@@ -133,6 +133,7 @@
 			if (typeof XMLHttpRequest !== 'undefined') {
 				//Browser
 				var req = new XMLHttpRequest();
+				req.withCredentials = true;
 				
 				//Response
 				req.onreadystatechange = function (e) {
@@ -450,7 +451,6 @@
 				var pendingUpdates = {};
 				var keys = [];
 				var cache = {};
-				var _length = Storage.prototype.length;
 				var _key = Storage.prototype.key;
 				var _getItem = Storage.prototype.getItem;
 				var _setItem = Storage.prototype.setItem;
