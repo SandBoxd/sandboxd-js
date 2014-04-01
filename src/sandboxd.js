@@ -469,7 +469,7 @@
 						failure = true;
 						throw err;
 					}
-				}, { game:_gameid }, params["uid"], params["sid"]);
+				}, { game:_gameid }, params["uid"], params["sid"], false);
 				
 				if (!failure) {
 					function setLength () {
