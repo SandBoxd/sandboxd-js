@@ -469,16 +469,21 @@
 						failure = true;
 						throw err;
 					}
-				}, { game:_gameid }, params["uid"], params["sid"], false);
+				}, { game:_gameid }, params["uid"], params["sid"]);
 				
 				if (!failure) {
 					function setLength () {
-						Object.defineProperty(localStorage, "length", {
-							configurable: true,
-							get: function () {
-								return keys.length;
-							}
-						});
+						try {
+							Object.defineProperty(localStorage, "length", {
+								configurable: true,
+								get: function () {
+									return keys.length;
+								}
+							});
+						} catch (e) {
+							//Some browsers may not like setting the length
+							//Unfortunatly we cannot do anything about this
+						}
 					}
 					setLength();
 					Storage.prototype.key = function (index) {
