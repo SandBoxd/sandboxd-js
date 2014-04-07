@@ -262,7 +262,7 @@
 			var cb = a2;
 			
 			if (typeof a2 == 'undefined') {
-				//Pull uid and sid from url
+				//Pull uid from url
 				cb = a1;
 				uid = params["uid"];
 			}
@@ -421,6 +421,23 @@
 			}
 			
 		};
+		
+		if (typeof window !== 'undefined') {
+			function updateSessionId (sid) {
+				params["sid"] = sid;
+			}
+			
+			//Watch for messages from SandBoxd
+			window.addEventListener("message", function (e) {
+				var o = e.data;
+				
+				if (typeof o === "object") {
+					if (o.type === "session") {
+						updateSessionId(o.data);
+					}
+				}
+			}, false);
+		}
 		
 		return /** @lends module:sandboxd */ {
 			
