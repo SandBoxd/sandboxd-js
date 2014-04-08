@@ -459,11 +459,13 @@
 			 * 
 			 * <p>This will intercept all calls to localStorage and store the data in
 			 * the SandBoxd cloud instead.</p>
+			 * 
+			 * @returns {Boolean} True if we are using cloud storage or false if an error occurred.
 			 */
 			autoCloudStorage: function () {
 				checkInit();
 				
-				if (params["uid"] == 0) return;		//Cloud storage not available for guests
+				if (params["uid"] == 0) return false;		//Cloud storage not available for guests
 				
 				var failure = false;
 				var pendingUpdates = {};
@@ -484,7 +486,6 @@
 						keys.sort();
 					} else {
 						failure = true;
-						throw err;
 					}
 				}, { game:_gameid }, params["uid"], params["sid"], false);
 				
@@ -580,6 +581,8 @@
 						pendingUpdates = {};
 					}, 10);
 				}
+				
+				return !failure;
 			},
 			
 			/**
