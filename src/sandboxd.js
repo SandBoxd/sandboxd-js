@@ -444,6 +444,8 @@
 			/**
 			 * <p>Initialize the library. This function must be called before using the SandBoxd API.</p>
 			 * 
+			 * @name module:sandboxd.init
+			 * @function
 			 * @param {Integer} gameid The unique game identifier.
 			 * @param {String} apikey The API key for this game.
 			 * @param {String} [host=api.sandboxd.com] Set this if you want to override the default host.
@@ -460,6 +462,8 @@
 			 * <p>This will intercept all calls to localStorage and store the data in
 			 * the SandBoxd cloud instead.</p>
 			 * 
+			 * @name module:sandboxd.autoCloudStorage
+			 * @function
 			 * @returns {Boolean} True if we are using cloud storage or false if an error occurred.
 			 */
 			autoCloudStorage: function () {
