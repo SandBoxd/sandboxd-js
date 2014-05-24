@@ -16,6 +16,10 @@
   * @param {String} [error] If present then an error has occured. You should always check this value before using the data. Check the string for a detailed description of the error.
   * @param {*} [data] The data returned by the call.
   */
+ /**
+  * @callback dataCallback
+  * @param {*} [data] The data returned by the call.
+  */
 (function () {
 	var sandboxd = (function () {
 		/*
@@ -56,6 +60,10 @@
 		var _gameid;
 		var _apikey;
 		var params = getQueryParameters();
+		
+		//Private vars
+		var listeners = [];
+		var currTransaction = null;
 		
 		//Param defaults
 		if (params["uid"] === undefined) params["uid"] = 0;
@@ -298,6 +306,21 @@
 			}
 		}
 		
+		function dispatchEvent (type, data) {
+			for (var i = 0; i < listeners.length; i++) {
+				if (listeners[i].type === type) {
+					listeners[i].cb(data);
+				}
+			}
+		}
+		
+		/**
+		 * Send a message to SandBoxd via iframe postMessage.
+		 */
+		function postMessage (type, data) {
+			window.parent.postMessage({ type:type, data:data }, "*");
+		}
+		
 		var storage = /** @lends module:sandboxd.storage */ {
 			
 			/**
@@ -434,7 +457,16 @@
 				if (typeof o === "object") {
 					if (o.type === "session") {
 						updateSessionId(o.data);
+					} else if (o.type === "transactionResponse") {
+						if (currTransaction != null) {
+							//Save callback to local variable because we want currTransaction to be null even if there is an error
+							var cb = currTransaction;
+							currTransaction = null;
+							currTransaction(o.data.error, o.data.microid);
+						}
 					}
+					
+					dispatchEvent(o.type, o.data);
 				}
 			}, false);
 		}
@@ -707,42 +739,51 @@
 			},
 			
 			/**
-			 * <p>Create a micro-transaction for the specified user. Calling this will present the user
-			 * with a purchase dialog to accept or decline the amount specified.</p>
-			 * 
-			 * <p>A successful response means the user accepted the transaction.</p>
-			 * 
-			 * <p>An error means either the user declined the transaction or something else went wrong.</p>
+			 * <p><b>[Client Only]</b> Create a micro-transaction for the current user. Calling this will present the user with a purchase dialog to accept or decline the amount specified.</p>
 			 * 
 			 * @name module:sandboxd.createTransaction
 			 * @function
 			 * @param {String} microid A unique identifier for this transaction you make up. You can use the microid to determine if a user has previously purchased this transaction.
 			 * @param {String} description A description of the virtual item the user is purchasing. This will be presented to the user so they can decide whether to accept the purchase or not.
 			 * @param {Integer} amount The cost of the transaction in credits. <b>100 credits = 1 USD</b>
+			 */
+			createTransaction: function (microid, description, amount, cb) {
+				if (currTransaction != null) return;	//Only one transaction allowed at a time
+				
+				currTransaction = cb;
+				postMessage("transaction", { microid:microid, desc:description, amount:amount });
+			},
+			
+			/**
+			 * <p>Since you can only initiate transactions on the client-side, it is sometimes useful to verify their success on the server.</p>
+			 * 
+			 * <p>Call this function to verify that the given user has indeed received the transaction in question.</p>
+			 * 
+			 * <p>A response with no error indicates the transaction is valid.</p>
+			 * 
+			 * @name module:sandboxd.verifyTransaction
+			 * @function
+			 * @param {String} microid The unique transaction identifier.
 			 * @param {Integer} uid The unique identifier of the user.
 			 * @param {String} sid The session identifier of the user.
 			 * @param {standardCallback} [cb] The result of the query.
 			 */
-			/**
-			 * <p><b>[Client Only]</b> Create a micro-transaction for the current user. Calling this will present the user
-			 * with a purchase dialog to accept or decline the amount specified.</p>
-			 * 
-			 * <p>A successful response means the user accepted the transaction.</p>
-			 * 
-			 * <p>An error means either the user declined the transaction or something else went wrong.</p>
-			 * 
-			 * @name module:sandboxd.createTransaction
-			 * @function
-			 * @param {String} microid A unique identifier for this transaction you make up. You can use the microid to determine if a user has previously purchased this transaction.
-			 * @param {String} description A description of the virtual item the user is purchasing. This will be presented to the user so they can decide whether to accept the purchase or not.
-			 * @param {Integer} amount The cost of the transaction in credits. <b>100 credits = 1 USD</b>
-			 * @param {standardCallback} [cb] The result of the query.
-			 */
-			createTransaction: function (microid, description, amount, a1, a2, a3) {
-				checkInit();
-				
+			verifyTransaction: function (microid, a1, a2, a3) {
 				var o = uidSidCallbackOverload(a1, a2, a3);
-				query("GET", "/transactions/create", o.cb, { session:o.sid, microid:microid, desc:description, amount:amount }, o.uid, o.sid);
+				getUserTransactions(a1, a2, a3, function (err, data) {
+					if (err) {
+						o.cb(err, null);
+						return;
+					}
+					
+					for (var i = 0; i < data.length; i++) {
+						if (data[i].microid === microid) {
+							o.cb(null, null);
+						}
+					}
+					
+					o.cb("Transaction not found.", null);
+				});
 			},
 			
 			/**
@@ -786,6 +827,35 @@
 				
 				var o = uidSidCallbackOverload(a1, a2, a3);
 				query("POST", "/gamesessions/update", o.cb, { session:o.sid, label:label, data:data }, o.uid, o.sid);
+			},
+			
+			/**
+			 * <p><b>[Client Only]</b> Subscribe to an event.</p>
+			 * 
+			 * @name module:sandboxd.subscribe
+			 * @function
+			 * @param {String} type The name of the event to subscribe to.
+			 * @param {dataCallback} [cb] A callback to be called when the event fires.
+			 */
+			subscribe: function (type, cb) {
+				listeners.push({type:type, cb:cb});
+			},
+			
+			/**
+			 * <p><b>[Client Only]</b> Unsubscribe from an event.</p>
+			 * 
+			 * @name module:sandboxd.unsubscribe
+			 * @function
+			 * @param {String} type The name of the event to unsubscribe from.
+			 * @param {dataCallback} [cb] The callback that you used to subscribe.
+			 */
+			unsubscribe: function (type, cb) {
+				for (var i = 0; i < listeners.length; i++) {
+					if (listeners[i].type === type && listeners[i].cb === cb) {
+						listeners.splice(i, 1);
+						return;
+					}
+				}
 			},
 			
 			/**
