@@ -63,7 +63,9 @@
 		
 		//Private vars
 		var listeners = [];
+		var currRegistration = null;
 		var currTransaction = null;
+		var autoStorageActivated = false;
 		
 		//Param defaults
 		if (params["uid"] === undefined) params["uid"] = 0;
@@ -445,25 +447,187 @@
 			
 		};
 		
-		if (typeof window !== 'undefined') {
-			function updateSessionId (sid) {
-				params["sid"] = sid;
+		var autoCloudStorage = function () {
+			checkInit();
+			autoStorageActivated = true;
+			
+			if (params["uid"] == 0) return false;		//Cloud storage not available for guests
+			
+			var failure = false;
+			var pendingUpdates = {};
+			var keys = [];
+			var cache = {};
+			var _key = Storage.prototype.key;
+			var _getItem = Storage.prototype.getItem;
+			var _setItem = Storage.prototype.setItem;
+			var _removeItem = Storage.prototype.removeItem;
+			
+			//Initialize the data -- need to do synchronously to make sure we have the data before any calls to localStorage
+			query("GET", "/storage", function (err, data) {
+				if (err == null) {
+					for (var i = 0; i < data.items.length; i++) {
+						keys.push(data.items[i].key);
+						cache[data.items[i].key] = data.items[i].value;
+					}
+					keys.sort();
+				} else {
+					failure = true;
+				}
+			}, { game:_gameid }, params["uid"], params["sid"], false);
+			
+			if (!failure) {
+				function setLength () {
+					try {
+						Object.defineProperty(localStorage, "length", {
+							configurable: true,
+							get: function () {
+								return keys.length;
+							}
+						});
+					} catch (e) {
+						//Some browsers may not like setting the length
+						//Unfortunatly we cannot do anything about this
+					}
+				}
+				setLength();
+				Storage.prototype.key = function (index) {
+					if (this === window.localStorage) {
+						setLength();
+						
+						return keys[index];
+					} else {
+						return _key.call(this, index);
+					}
+				};
+				Storage.prototype.getItem = function (key) {
+					if (this === window.localStorage) {
+						setLength();
+						
+						return cache[key];
+					} else {
+						return _getItem.call(this, key);
+					}
+				};
+				Storage.prototype.setItem = function (key, value) {
+					if (this === window.localStorage) {
+						setLength();
+						
+						if (cache[key] === undefined) {
+							keys.push(key);
+							keys.sort();
+						}
+						
+						if (cache[key] !== value) {
+							cache[key] = value;
+							pendingUpdates[key] = "set";
+						}
+					} else {
+						_setItem.call(this, key, value);
+					}
+				};
+				Storage.prototype.removeItem = function (key) {
+					if (this === window.localStorage) {
+						setLength();
+						
+						delete cache[key];
+						for (var i = 0; i < keys.length; i++) {
+							if (keys[i] == key) {
+								keys.splice(i, 1);
+								break;
+							}
+						}
+						pendingUpdates[key] = "rem";
+					} else {
+						_removeItem.call(this, key);
+					}
+				};
+				Storage.prototype.clear = function () {
+					if (this === window.localStorage) {
+						setLength();
+						
+						for (var i = 0; i < keys.length; i++) {
+							this.removeItem(key[i]);
+						}
+					} else {
+						_removeItem.clear(this);
+					}
+				};
+				
+				//Every frame check for pending updates and apply them
+				//This will cut down on calls because only the last command gets applied
+				setInterval(function () {
+					for (var i in pendingUpdates) {
+						if (pendingUpdates[i] == "set") {
+							storage.setItem(i, cache[i]);
+						} else if (pendingUpdates[i] == "rem") {
+							storage.removeItem(i);
+						}
+					}
+					
+					pendingUpdates = {};
+				}, 10);
 			}
 			
+			return !failure;
+		};
+		
+		if (typeof window !== 'undefined') {
 			//Watch for messages from SandBoxd
 			window.addEventListener("message", function (e) {
+				var onSessionUpdate = function (data) {
+					//We need to turn on automatic cloud storage if we have just logged in/registered
+					var justLoggedIn = params["uid"] == 0 && data.uid != 0;
+					
+					params["sid"] = data.sid;
+					params["uid"] = data.uid;
+					
+					if (justLoggedIn) {
+						if (autoStorageActivated) {
+							//Write out local storage to cloud
+							var len = window.localStorage.length;
+							var successes = 0;
+							for (var i = 0; i < len; i++) {
+								var key = window.localStorage.key(i);
+								storage.setItem(key, window.localStorage.getItem(key), function (err, data) {
+									if (err == null) {
+										successes++;
+										
+										if (successes == len) {
+											//Activate automatic cloud storage
+											autoCloudStorage();
+										}
+									} else {
+										//Some error occurred -- do not turn on automatic cloud storage
+									}
+								});
+							}
+						}
+						
+						if (currRegistration != null) {
+							//Save callback to local variable because we want currRegistration to be null even if there is an error
+							var cb = currRegistration;
+							currRegistration = null;
+							cb(null, { uid:data.uid });
+						}
+					}
+				};
+				
+				var onTransactionResponse = function (data) {
+					if (currTransaction != null) {
+						//Save callback to local variable because we want currTransaction to be null even if there is an error
+						var cb = currTransaction;
+						currTransaction = null;
+						cb(data.error, data.microid);
+					}
+				};
+				
 				var o = e.data;
 				
 				if (typeof o === "object") {
 					if (o.type === "session") {
-						updateSessionId(o.data);
+						onSessionUpdate(o.data);
 					} else if (o.type === "transactionResponse") {
-						if (currTransaction != null) {
-							//Save callback to local variable because we want currTransaction to be null even if there is an error
-							var cb = currTransaction;
-							currTransaction = null;
-							currTransaction(o.data.error, o.data.microid);
-						}
+						onTransactionResponse(o.data);
 					}
 					
 					dispatchEvent(o.type, o.data);
@@ -498,128 +662,7 @@
 			 * @function
 			 * @returns {Boolean} True if we are using cloud storage or false if an error occurred.
 			 */
-			autoCloudStorage: function () {
-				checkInit();
-				
-				if (params["uid"] == 0) return false;		//Cloud storage not available for guests
-				
-				var failure = false;
-				var pendingUpdates = {};
-				var keys = [];
-				var cache = {};
-				var _key = Storage.prototype.key;
-				var _getItem = Storage.prototype.getItem;
-				var _setItem = Storage.prototype.setItem;
-				var _removeItem = Storage.prototype.removeItem;
-				
-				//Initialize the data -- need to do synchronously to make sure we have the data before any calls to localStorage
-				query("GET", "/storage", function (err, data) {
-					if (err == null) {
-						for (var i = 0; i < data.items.length; i++) {
-							keys.push(data.items[i].key);
-							cache[data.items[i].key] = data.items[i].value;
-						}
-						keys.sort();
-					} else {
-						failure = true;
-					}
-				}, { game:_gameid }, params["uid"], params["sid"], false);
-				
-				if (!failure) {
-					function setLength () {
-						try {
-							Object.defineProperty(localStorage, "length", {
-								configurable: true,
-								get: function () {
-									return keys.length;
-								}
-							});
-						} catch (e) {
-							//Some browsers may not like setting the length
-							//Unfortunatly we cannot do anything about this
-						}
-					}
-					setLength();
-					Storage.prototype.key = function (index) {
-						if (this === window.localStorage) {
-							setLength();
-							
-							return keys[index];
-						} else {
-							return _key.call(this, index);
-						}
-					};
-					Storage.prototype.getItem = function (key) {
-						if (this === window.localStorage) {
-							setLength();
-							
-							return cache[key];
-						} else {
-							return _getItem.call(this, key);
-						}
-					};
-					Storage.prototype.setItem = function (key, value) {
-						if (this === window.localStorage) {
-							setLength();
-							
-							if (cache[key] === undefined) {
-								keys.push(key);
-								keys.sort();
-							}
-							
-							if (cache[key] !== value) {
-								cache[key] = value;
-								pendingUpdates[key] = "set";
-							}
-						} else {
-							_setItem.call(this, key, value);
-						}
-					};
-					Storage.prototype.removeItem = function (key) {
-						if (this === window.localStorage) {
-							setLength();
-							
-							delete cache[key];
-							for (var i = 0; i < keys.length; i++) {
-								if (keys[i] == key) {
-									keys.splice(i, 1);
-									break;
-								}
-							}
-							pendingUpdates[key] = "rem";
-						} else {
-							_removeItem.call(this, key);
-						}
-					};
-					Storage.prototype.clear = function () {
-						if (this === window.localStorage) {
-							setLength();
-							
-							for (var i = 0; i < keys.length; i++) {
-								this.removeItem(key[i]);
-							}
-						} else {
-							_removeItem.clear(this);
-						}
-					};
-					
-					//Every frame check for pending updates and apply them
-					//This will cut down on calls because only the last command gets applied
-					setInterval(function () {
-						for (var i in pendingUpdates) {
-							if (pendingUpdates[i] == "set") {
-								storage.setItem(i, cache[i]);
-							} else if (pendingUpdates[i] == "rem") {
-								storage.removeItem(i);
-							}
-						}
-						
-						pendingUpdates = {};
-					}, 10);
-				}
-				
-				return !failure;
-			},
+			autoCloudStorage: autoCloudStorage,
 			
 			/**
 			 * <p>Verify that the specified user is who they claim to be.</p>
@@ -830,7 +873,7 @@
 			},
 			
 			/**
-			 * <p><b>[Client Only]</b> Subscribe to an event.</p>
+			 * <p><b>[Client Only]</b> Subscribe to an event sent by SandBoxd.</p>
 			 * 
 			 * @name module:sandboxd.subscribe
 			 * @function
@@ -856,6 +899,22 @@
 						return;
 					}
 				}
+			},
+			
+			/**
+			 * <p><b>[Client Only]</b> Prompt the user to register. If the user is already logged in, calling this function does nothing.</p>
+			 * 
+			 * <p>Once the user successfully registers you can save their score, update their cloud storage, etc.</p>
+			 * 
+			 * @name module:sandboxd.register
+			 * @function
+			 * @param {standardCallback} [cb] The result of the query.
+			 */
+			register: function (cb) {
+				if (params["uid"] != 0 || currRegistration != null) return;
+				
+				currRegistration = cb;
+				postMessage("register", {});
 			},
 			
 			/**
