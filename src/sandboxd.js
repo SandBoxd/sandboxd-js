@@ -902,19 +902,29 @@
 			},
 			
 			/**
-			 * <p><b>[Client Only]</b> Prompt the user to register. If the user is already logged in, calling this function does nothing.</p>
+			 * <p><b>[Client Only]</b> Prompt the user to share their high score with others through various mediums. This is usually called after at the end of a gameplay round.</p>
 			 * 
-			 * <p>Once the user successfully registers you can save their score, update their cloud storage, etc.</p>
+			 * <p>If the user is logged in then they will be presented with an option to share their score to various mediums. The callback will never be called in this case.</p>
 			 * 
-			 * @name module:sandboxd.register
+			 * <p>If the user is logged out then they will also be presented the option to register with SandBoxd. If the user decides to register, their high score will automatically be associated with their account. The provided callback will then be called so you can update any other relevant data for the user such as cloud storage, etc. Please note that if you have automatic cloud storage turned on then the user's SandBoxd storage will be updated automatically.</p>
+			 * 
+			 * @name module:sandboxd.highScore
 			 * @function
-			 * @param {standardCallback} [cb] The result of the query.
+			 * @param {String} statName The name of stat in which you got a high score.
+			 * @param {Number} statValue The value of the player's high score.
+			 * @param {standardCallback} [cb] A callback that is called upon successful registration.
 			 */
-			register: function (cb) {
-				if (params["uid"] != 0 || currRegistration != null) return;
+			highScore: function (statName, statValue, cb) {
+				if (currRegistration != null) return;
 				
-				currRegistration = cb;
-				postMessage("register", {});
+				if (params["uid"] == 0) {
+					currRegistration = function (err, data) {
+						sandboxd.stats.update(statName, statValue);
+						
+						if (cb != null) cb(null, data);
+					};
+				}
+				postMessage("highScore", { statName:statName, statValue:statValue });
 			},
 			
 			/**
