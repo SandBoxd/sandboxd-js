@@ -928,6 +928,19 @@
 			},
 			
 			/**
+			 * <p><b>[Client Only]</b> Displays a prompt that allows the user to invite their friends.</p>
+			 * 
+			 * <p>You can supply custom data that will be provided to your game as query parameter when the user accepts the invite.</p>
+			 * 
+			 * @name module:sandboxd.invite
+			 * @function
+			 * @param {String} [data] Custom data to append to the query string when the user accepts the invite.
+			 */
+			invite: function (data) {
+				postMessage("invite", { data:data });
+			},
+			
+			/**
 			 * Access to cloud storage.
 			 * 
 			 * @namespace {Object} module:sandboxd.storage
@@ -997,7 +1010,7 @@
 						}
 						
 						if (o.cb != null) o.cb(err, data);
-					}, { user:o.uid });
+					}, { user:o.uid, game:_gameid });
 				},
 				
 				/**
@@ -1096,7 +1109,7 @@
 						}
 						
 						if (o.cb != null) o.cb(err, data);
-					}, { user:o.uid });
+					}, { user:o.uid, game:_gameid });
 				},
 				
 				/**
