@@ -1,6 +1,6 @@
 {
 	"name": "sandboxd",
-	"version": "2.2.63",
+	"version": "2.3.64",
 	"description": "A client library for interacting with the SandBoxd API.",
 	"author": "SandBoxd Inc.",
 	"homepage": "http://developers.sandboxd.com/",

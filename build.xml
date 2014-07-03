@@ -5,7 +5,7 @@
 	<property name="doc" value="doc"/>
 	<property name="deploy" value="deploy"/>
 	<property name="jsprefix" value="sandboxd"/>
-	<property name="version" value="2.2"/>
+	<property name="version" value="2.3"/>
 	<property name="apiVersion" value="20140305"/>
 	
     <target name="clean">

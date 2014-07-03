@@ -902,9 +902,9 @@
 			},
 			
 			/**
-			 * <p><b>[Client Only]</b> Prompt the user to share their high score with others through various mediums. This is usually called after at the end of a gameplay round.</p>
+			 * <p><b>[Client Only]</b> Prompt the user to share their high score with others through various mediums, but only if the user's score beats their previous high score. This is usually called after at the end of a gameplay round.</p>
 			 * 
-			 * <p>If the user is logged in then they will be presented with an option to share their score to various mediums. The callback will never be called in this case.</p>
+			 * <p>If the user is logged in then they will be presented with an option to share their score to various mediums. Additionally the user's score stat will be updated. The callback will never be called in this case.</p>
 			 * 
 			 * <p>If the user is logged out then they will also be presented the option to register with SandBoxd. If the user decides to register, their high score will automatically be associated with their account. The provided callback will then be called so you can update any other relevant data for the user such as cloud storage, etc. Please note that if you have automatic cloud storage turned on then the user's SandBoxd storage will be updated automatically.</p>
 			 * 
@@ -912,10 +912,12 @@
 			 * @function
 			 * @param {String} statName The name of stat in which you got a high score.
 			 * @param {Number} statValue The value of the player's high score.
+			 * @param {Boolean} [showPopup] Set this to false if you don't want a share screen to popup. IE only the user's high score will be updated.
 			 * @param {standardCallback} [cb] A callback that is called upon successful registration.
 			 */
-			highScore: function (statName, statValue, cb) {
+			highScore: function (statName, statValue, showPopup, cb) {
 				if (currRegistration != null) return;
+				if (showPopup == null) showPopup = true;
 				
 				if (params["uid"] == 0) {
 					currRegistration = function (err, data) {
@@ -923,8 +925,17 @@
 						
 						if (cb != null) cb(null, data);
 					};
+					
+					if (showPopup) postMessage("highScore", { statName:statName, statValue:statValue });
+				} else {
+					sandboxd.stats.get(statName, function (err, data) {
+						if (err == null && (data == null || statValue > data.value)) {
+							sandboxd.stats.update(statName, statValue);
+							
+							if (showPopup) postMessage("highScore", { statName:statName, statValue:statValue });
+						}
+					});
 				}
-				postMessage("highScore", { statName:statName, statValue:statValue });
 			},
 			
 			/**
@@ -982,6 +993,40 @@
 				},
 				
 				/**
+				 * <p>View an achievement for the specified user. Returns null if the user does not have this achievement.</p>
+				 * 
+				 * @name module:sandboxd.achievements.get
+				 * @function
+				 * @param {String} key The achievement name.
+				 * @param {Integer} uid The unique identifier of the user.
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
+				/**
+				 * <p><b>[Client Only]</b> View an achievement for the current user. Returns null if the user does not have this achievement.</p>
+				 * 
+				 * <p>The achievement object returned will have a convenience function "update()" to update the value.</p>
+				 * 
+				 * @name module:sandboxd.achievements.get
+				 * @function
+				 * @param {String} key The achievement name.
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
+				get: function (key, a1, a2) {
+					var self = this;
+					var o = uidCallbackOverload(a1, a2);
+					query("GET", "/achievements/" + o.uid, function (err, data) {
+						if (err == null && data != null) {
+							data.update = function (value) {
+								this.value = value;
+								self.update(this.achievement.name, value);
+							}.bind(data);
+						}
+						
+						if (o.cb != null) o.cb(err, data);
+					}, { key:key, game:_gameid });
+				},
+				
+				/**
 				 * <p>List all achievements for the specified user.</p>
 				 * 
 				 * @name module:sandboxd.achievements.list
@@ -990,9 +1035,9 @@
 				 * @param {standardCallback} [cb] The result of the query.
 				 */
 				/**
-				 * <p><b>[Client Only]</b> List all achievements for the specified user.</p>
+				 * <p><b>[Client Only]</b> List all achievements for the current user.</p>
 				 * 
-				 * <p>The achievement objects returned have a convience function "update()" to update the value.</p>
+				 * <p>The achievement objects returned have a convenience function "update()" to update the value.</p>
 				 * 
 				 * @name module:sandboxd.achievements.list
 				 * @function
@@ -1016,7 +1061,7 @@
 				/**
 				 * <p>List all achievement definitions for this game.</p>
 				 * 
-				 * <p>The achievement definition objects returned have a convience function "create()" to create a new achievement for the current user.</p>
+				 * <p>The achievement definition objects returned have a convenience function "create()" to create a new achievement for the current user.</p>
 				 * 
 				 * @name module:sandboxd.achievements.getDefinitions
 				 * @function
@@ -1081,6 +1126,40 @@
 				},
 				
 				/**
+				 * <p>View a statistic for the specified user. Returns null if the user does not have this stat.</p>
+				 * 
+				 * @name module:sandboxd.stats.get
+				 * @function
+				 * @param {String} key The statistic name.
+				 * @param {Integer} uid The unique identifier of the user.
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
+				/**
+				 * <p><b>[Client Only]</b> View an statistic for the current user. Returns null if the user does not have this stat.</p>
+				 * 
+				 * <p>The statistic object returned will have a convenience function "update()" to update the value.</p>
+				 * 
+				 * @name module:sandboxd.stats.get
+				 * @function
+				 * @param {String} key The statistic name.
+				 * @param {standardCallback} [cb] The result of the query.
+				 */
+				get: function (key, a1, a2) {
+					var self = this;
+					var o = uidCallbackOverload(a1, a2);
+					query("GET", "/stats/" + o.uid, function (err, data) {
+						if (err == null && data != null) {
+							data.update = function (value) {
+								this.value = value;
+								self.update(this.stat.name, value);
+							}.bind(data);
+						}
+						
+						if (o.cb != null) o.cb(err, data);
+					}, { key:key, game:_gameid });
+				},
+				
+				/**
 				 * <p>List all statistics for the specified user.</p>
 				 * 
 				 * @name module:sandboxd.stats.list
@@ -1091,7 +1170,7 @@
 				/**
 				 * <p><b>[Client Only]</b> List all statistics for the specified user.</p>
 				 * 
-				 * <p>The stat objects returned have a convience function "update()" to update the value.</p>
+				 * <p>The stat objects returned have a convenience function "update()" to update the value.</p>
 				 * 
 				 * @name module:sandboxd.stats.list
 				 * @function
@@ -1115,7 +1194,7 @@
 				/**
 				 * <p>List all statistic definitions for this game.</p>
 				 * 
-				 * <p>The stat definition objects returned have a convience function "create()" to create a new achievement for the current user.</p>
+				 * <p>The stat definition objects returned have a convenience function "create()" to create a new stat for the current user.</p>
 				 * 
 				 * @name module:sandboxd.stats.getDefinitions
 				 * @function
